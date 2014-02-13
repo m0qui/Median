@@ -24,6 +24,11 @@ private:
     bool processchroma;
     unsigned int depth;
     unsigned char (*med)(unsigned char*);
+    PVideoFrame output;
+
+    void ProcessPlane(int plane, PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
+    void ProcessPlanarFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
+    void ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
 };
 
 

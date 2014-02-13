@@ -13,6 +13,7 @@
 //
 // History:
 // 12-Feb-2014,  0.1: Initial release. YUY2 support only.
+// 13-Feb-2014,  0.2: Added support for RGB and planar formats
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +27,7 @@
 // Constructor
 //////////////////////////////////////////////////////////////////////////////
 Median::Median(PClip _child, vector<PClip> _clips, bool _processchroma, IScriptEnvironment *env) :
-  GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma)
+GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma), output(env->NewVideoFrame(vi))
 {
     depth = clips.size();
 
@@ -50,9 +51,6 @@ Median::Median(PClip _child, vector<PClip> _clips, bool _processchroma, IScriptE
 
     for (unsigned int i = 0; i < depth; i++)
         info.push_back(clips[i]->GetVideoInfo());
-
-    if (!info[0].IsYUY2())
-        env->ThrowError(ERROR_PREFIX "Only YUY2 is supported. Use ConvertToYUY2().");
 
     for (unsigned int i = 1; i < depth; i++)
     {
@@ -83,48 +81,196 @@ PVideoFrame __stdcall Median::GetFrame(int n, IScriptEnvironment* env)
 {
     // Source
     PVideoFrame src[MAX_DEPTH];
+
+    for (unsigned int i = 0; i < depth; i++)
+        src[i] = clips[i]->GetFrame(n, env);
+
+    // Select between planar and interleaved processing
+    if (info[0].IsPlanar())
+        ProcessPlanarFrame(src, output);
+    else
+        ProcessInterleavedFrame(src, output);
+
+    return output;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Image processing for planar images
+//////////////////////////////////////////////////////////////////////////////
+void Median::ProcessPlanarFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst)
+{
+    // Luma
+    ProcessPlane(PLANAR_Y, src, dst);
+
+    // Chroma
+    if (processchroma)
+    {
+        ProcessPlane(PLANAR_U, src, dst);
+        ProcessPlane(PLANAR_V, src, dst);
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Processing of a single plane
+//////////////////////////////////////////////////////////////////////////////
+void Median::ProcessPlane(int plane, PVideoFrame src[MAX_DEPTH], PVideoFrame& dst)
+{
+    // Source
     const unsigned char* srcp[MAX_DEPTH];
 
     for (unsigned int i = 0; i < depth; i++)
-    {
-        src[i] = clips[i]->GetFrame(n, env);
-        srcp[i] = src[i]->GetReadPtr();
-    }
-
+        srcp[i] = src[i]->GetReadPtr(plane);
+    
     // Destination
-    PVideoFrame dst = env->NewVideoFrame(vi);
-    unsigned char* dstp = dst->GetWritePtr();
+    unsigned char* dstp = dst->GetWritePtr(plane);
 
-    // Loop over entire frame and calculate the resulting median
-    for (int y = 0; y < info[0].height; ++y)
+    // Dimensions
+    const int width = src[0]->GetRowSize(plane);
+    const int height = src[0]->GetHeight(plane);
+
+    // Process
+    for (int y = 0; y < height; ++y)
     {
-        for (int x = 0; x < info[0].width; x++)
+        for (int x = 0; x < width; ++x)
         {
-            unsigned char luma[MAX_DEPTH];
-            unsigned char chroma[MAX_DEPTH];
+            unsigned char values[MAX_DEPTH];
 
             for (unsigned int i = 0; i < depth; i++)
-            {
-                luma[i] = srcp[i][x * 2]; // Y#Y#Y#Y#...
-                chroma[i] = srcp[i][x * 2 + 1]; // #U#V#U#V...
-            }
+                values[i] = srcp[i][x];
 
-            dstp[x * 2] = med(luma);
-
-            if (processchroma)
-                dstp[x * 2 + 1] = med(chroma);
-            else
-                dstp[x * 2 + 1] = chroma[0]; // Use chroma from first clip
+            dstp[x] = med(values);
         }
 
-        // Advance to next line
         for (unsigned int i = 0; i < depth; i++)
-            srcp[i] = srcp[i] + src[i]->GetPitch();
+            srcp[i] = srcp[i] + src[i]->GetPitch(plane);
 
-        dstp = dstp + dst->GetPitch();
+        dstp = dstp + dst->GetPitch(plane);
     }
+}
 
-    return dst;
+
+//////////////////////////////////////////////////////////////////////////////
+// Image processing for interleaved images
+//////////////////////////////////////////////////////////////////////////////
+void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst)
+{
+    // Source
+    const unsigned char* srcp[MAX_DEPTH];
+
+    for (unsigned int i = 0; i < depth; i++)
+        srcp[i] = src[i]->GetReadPtr();
+
+    // Destination
+    unsigned char* dstp = dst->GetWritePtr();
+
+    // Dimensions
+    const int width = info[0].width;
+    const int height = info[0].height;
+
+    // Process
+    if (info[0].IsYUY2())
+    {
+        //////////////////////////////////////////////////////////////////////
+        // YUYV
+        //////////////////////////////////////////////////////////////////////
+        unsigned char luma[MAX_DEPTH];
+        unsigned char chroma[MAX_DEPTH];
+
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                for (unsigned int i = 0; i < depth; i++)
+                {
+                    luma[i] = srcp[i][x * 2];
+                    chroma[i] = srcp[i][x * 2 + 1];
+                }
+
+                dstp[x * 2] = med(luma);
+
+                if (processchroma)
+                    dstp[x * 2 + 1] = med(chroma);
+                else
+                    dstp[x * 2 + 1] = chroma[0]; // Use chroma from first clip
+            }
+
+            for (unsigned int i = 0; i < depth; i++)
+                srcp[i] = srcp[i] + src[i]->GetPitch();
+
+            dstp = dstp + dst->GetPitch();
+        }
+    }
+    else if (info[0].IsRGB24())
+    {
+        //////////////////////////////////////////////////////////////////////
+        // BGR
+        //////////////////////////////////////////////////////////////////////
+        unsigned char b[MAX_DEPTH];
+        unsigned char g[MAX_DEPTH];
+        unsigned char r[MAX_DEPTH];
+
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                for (unsigned int i = 0; i < depth; i++)
+                {
+                    b[i] = srcp[i][x * 3];
+                    g[i] = srcp[i][x * 3 + 1];
+                    r[i] = srcp[i][x * 3 + 2];
+                }
+
+                dstp[x * 3] = med(b);
+                dstp[x * 3 + 1] = med(g);
+                dstp[x * 3 + 2] = med(r);
+            }
+
+            for (unsigned int i = 0; i < depth; i++)
+                srcp[i] = srcp[i] + src[i]->GetPitch();
+
+            dstp = dstp + dst->GetPitch();
+        }
+    }
+    else if (info[0].IsRGB32())
+    {
+        //////////////////////////////////////////////////////////////////////
+        // BGRA
+        //////////////////////////////////////////////////////////////////////
+        unsigned char b[MAX_DEPTH];
+        unsigned char g[MAX_DEPTH];
+        unsigned char r[MAX_DEPTH];
+        unsigned char a[MAX_DEPTH];
+
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                for (unsigned int i = 0; i < depth; i++)
+                {
+                    b[i] = srcp[i][x * 4];
+                    g[i] = srcp[i][x * 4 + 1];
+                    r[i] = srcp[i][x * 4 + 2];
+                    a[i] = srcp[i][x * 4 + 3];
+                }
+
+                dstp[x * 4] = med(b);
+                dstp[x * 4 + 1] = med(g);
+                dstp[x * 4 + 2] = med(r);
+
+                if (processchroma)
+                    dstp[x * 4 + 3] = med(a);
+                else
+                    dstp[x * 4 + 3] = a[0]; // Use alpha from first clip
+            }
+
+            for (unsigned int i = 0; i < depth; i++)
+                srcp[i] = srcp[i] + src[i]->GetPitch();
+
+            dstp = dstp + dst->GetPitch();
+        }
+    }
 }
 
 
