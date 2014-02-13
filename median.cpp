@@ -12,8 +12,9 @@
 // Forum thread: http://forum.doom9.org/showthread.php?t=170216
 //
 // History:
-// 12-Feb-2014,  0.1: Initial release. YUY2 support only.
+// 12-Feb-2014,  0.1: Initial release. YUY2 support only
 // 13-Feb-2014,  0.2: Added support for RGB and planar formats
+// 13-Feb-2014,  0.3: Fixed output frame buffer issue
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +28,7 @@
 // Constructor
 //////////////////////////////////////////////////////////////////////////////
 Median::Median(PClip _child, vector<PClip> _clips, bool _processchroma, IScriptEnvironment *env) :
-GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma), output(env->NewVideoFrame(vi))
+GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma)
 {
     depth = clips.size();
 
@@ -84,6 +85,9 @@ PVideoFrame __stdcall Median::GetFrame(int n, IScriptEnvironment* env)
 
     for (unsigned int i = 0; i < depth; i++)
         src[i] = clips[i]->GetFrame(n, env);
+
+	// Output
+	PVideoFrame output = env->NewVideoFrame(vi);
 
     // Select between planar and interleaved processing
     if (info[0].IsPlanar())
