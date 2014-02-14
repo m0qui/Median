@@ -18,3 +18,8 @@
 // TODO: reference additional headers your program requires here
 #include "avisynth.h"
 #include "opt_med.h"
+#include "median.h"
+
+#include <algorithm>
+
+#define ERROR_PREFIX "Median: "

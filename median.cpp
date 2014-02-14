@@ -1,36 +1,23 @@
-//////////////////////////////////////////////////////////////////////////////
-// Median filter for AviSynth
-//
-// This filter will take in a number of clips and calculate a pixel-by-pixel
-// median out of them. This is useful for reducing noise and glitches in
-// analog tape captures, but may have other uses as well.
-//
-// Author: antti.korhola@gmail.com
-//
-// License: Public domain. Credit would be nice, but do with this what you will.
-//
-// Forum thread: http://forum.doom9.org/showthread.php?t=170216
-//
-// History:
-// 12-Feb-2014,  0.1: Initial release. YUY2 support only
-// 13-Feb-2014,  0.2: Added support for RGB and planar formats
-// 13-Feb-2014,  0.3: Fixed output frame buffer issue
-//
-//////////////////////////////////////////////////////////////////////////////
-
 #include "stdafx.h"
 #include "median.h"
-
-#define ERROR_PREFIX "Median: "
 
 
 //////////////////////////////////////////////////////////////////////////////
 // Constructor
 //////////////////////////////////////////////////////////////////////////////
-Median::Median(PClip _child, vector<PClip> _clips, bool _processchroma, IScriptEnvironment *env) :
-GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma)
+Median::Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned int _high, bool _processchroma, IScriptEnvironment *env) :
+  GenericVideoFilter(_child), low(_low), high(_high), clips(_clips), processchroma(_processchroma)
 {
     depth = clips.size();
+
+	blend = depth - low - high;
+
+    if (blend == 1 && low == high && depth < MAX_OPT)
+        fastprocess = true;
+    else
+        fastprocess = false;
+
+    //env->ThrowError("depth %d blend %d low %d high %d fast %d", depth, blend, low, high, (int)fastprocess);
 
     switch (depth)
     {
@@ -46,8 +33,6 @@ GenericVideoFilter(_child), clips(_clips), processchroma(_processchroma)
         case 9:
             med = opt_med9;
             break;
-        default:
-            env->ThrowError(ERROR_PREFIX "This should not happen, but somehow an unexpected number of clips ended up being processed.");
     }
 
     for (unsigned int i = 0; i < depth; i++)
@@ -144,7 +129,7 @@ void Median::ProcessPlane(int plane, PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
             for (unsigned int i = 0; i < depth; i++)
                 values[i] = srcp[i][x];
 
-            dstp[x] = med(values);
+            dstp[x] = ProcessPixel(values);
         }
 
         for (unsigned int i = 0; i < depth; i++)
@@ -192,10 +177,10 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
                     chroma[i] = srcp[i][x * 2 + 1];
                 }
 
-                dstp[x * 2] = med(luma);
+                dstp[x * 2] = ProcessPixel(luma);
 
                 if (processchroma)
-                    dstp[x * 2 + 1] = med(chroma);
+                    dstp[x * 2 + 1] = ProcessPixel(chroma);
                 else
                     dstp[x * 2 + 1] = chroma[0]; // Use chroma from first clip
             }
@@ -226,9 +211,9 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
                     r[i] = srcp[i][x * 3 + 2];
                 }
 
-                dstp[x * 3] = med(b);
-                dstp[x * 3 + 1] = med(g);
-                dstp[x * 3 + 2] = med(r);
+                dstp[x * 3] = ProcessPixel(b);
+                dstp[x * 3 + 1] = ProcessPixel(g);
+                dstp[x * 3 + 2] = ProcessPixel(r);
             }
 
             for (unsigned int i = 0; i < depth; i++)
@@ -259,12 +244,12 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
                     a[i] = srcp[i][x * 4 + 3];
                 }
 
-                dstp[x * 4] = med(b);
-                dstp[x * 4 + 1] = med(g);
-                dstp[x * 4 + 2] = med(r);
+                dstp[x * 4] = ProcessPixel(b);
+                dstp[x * 4 + 1] = ProcessPixel(g);
+                dstp[x * 4 + 2] = ProcessPixel(r);
 
                 if (processchroma)
-                    dstp[x * 4 + 3] = med(a);
+                    dstp[x * 4 + 3] = ProcessPixel(a);
                 else
                     dstp[x * 4 + 3] = a[0]; // Use alpha from first clip
             }
@@ -279,32 +264,36 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
 
 
 //////////////////////////////////////////////////////////////////////////////
-// Create filter
+// Processing of a stack of pixel values
 //////////////////////////////////////////////////////////////////////////////
-AVSValue __cdecl Create_Median(AVSValue args, void* user_data, IScriptEnvironment* env)
+inline unsigned char Median::ProcessPixel(unsigned char* values) const
 {
-    AVSValue array = args[0];
-    int n = array.ArraySize();
+    unsigned char output;
 
-    if (n != 3 && n != 5 && n != 7 && n != 9)
-        env->ThrowError(ERROR_PREFIX "Need 3, 5, 7 or 9 clips.");
+    if (fastprocess) // Can use a fast method
+    {
+        output = med(values);
+    }
+    else // Have to sort the whole thing
+    {
+        std::sort(values, values + depth);
 
-    vector<PClip> clips;
+        if (blend > 1) // Need to average middle values
+        {
+            unsigned int sum = 0;
 
-    for (int i = 0; i < n; i++)
-        clips.push_back(array[i].AsClip());
+            for (unsigned int i = low; i < low + blend; i++)
+                sum = sum + values[i];
 
-    return new Median(clips[0], clips, args[1].AsBool(true), env);
+            output = sum / blend;
+        }
+        else // Return a single value
+        {
+            output = values[low];
+        }
+    }
+
+    return output;
 }
 
-
-//////////////////////////////////////////////////////////////////////////////
-// Add filter
-//////////////////////////////////////////////////////////////////////////////
-extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment* env)
-{
-    env->AddFunction("Median", "c+[CHROMA]b", Create_Median, 0);
-
-    return "Median of clips filter";
-}
 

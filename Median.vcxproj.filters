@@ -18,6 +18,9 @@
     <ClCompile Include="median.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="filter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="avisynth.h">
