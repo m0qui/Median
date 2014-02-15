@@ -13,21 +13,24 @@ const unsigned int MAX_OPT = 9;
 class Median : public GenericVideoFilter
 {
 public:
-	Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned int _high, bool _processchroma, IScriptEnvironment *env);
+    Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned int _high, bool _temporal, bool _processchroma, IScriptEnvironment *env);
 	~Median();
 
 	PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env);
 
 private:
     vector<PClip> clips;
-    vector<VideoInfo> info;
+    unsigned int low;
+    unsigned int high;
+    bool temporal;
     bool processchroma;
+
     unsigned int depth;
-	unsigned int low;
-	unsigned int high;
-	unsigned int blend;
+    unsigned int blend;
     bool fastprocess;
-    unsigned char (*med)(unsigned char*);
+    vector<VideoInfo> info;
+
+    unsigned char (*fastmedian)(unsigned char*);
 
     void ProcessPlane(int plane, PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
     void ProcessPlanarFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);

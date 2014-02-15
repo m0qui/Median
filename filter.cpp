@@ -16,6 +16,7 @@
 // 13-Feb-2014,  0.2: Added support for RGB and planar formats
 // 13-Feb-2014,  0.3: Fixed output frame buffer issue
 // 14-Feb-2014,  0.4: Added MedianBlend functionality
+// 15-Mar-2014,  0.5: Added TemporalMedian functionality
 //
 //////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +42,28 @@ AVSValue __cdecl Create_Median(AVSValue args, void* user_data, IScriptEnvironmen
 	// Set low and high so that a regular median function is achieved
 	unsigned int limit = (n - 1) / 2;
 
-	return new Median(clips[0], clips, limit, limit, args[1].AsBool(true), env);
+    bool chroma = args[1].AsBool(true);
+
+	return new Median(clips[0], clips, limit, limit, false, chroma, env);
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Create TemporalMedian filter
+//////////////////////////////////////////////////////////////////////////////
+AVSValue __cdecl Create_TemporalMedian(AVSValue args, void* user_data, IScriptEnvironment* env)
+{
+    vector<PClip> clips;
+    clips.push_back(args[0].AsClip());
+
+    int radius = args[1].AsInt(1);
+
+    if (radius < 1 || radius > 12)
+        env->ThrowError(ERROR_PREFIX "Radius needs to be between 1 and 12.");
+
+    bool chroma = args[2].AsBool(true);
+
+    return new Median(clips[0], clips, radius, radius, true, chroma, env);
 }
 
 
@@ -67,7 +89,9 @@ AVSValue __cdecl Create_MedianBlend(AVSValue args, void* user_data, IScriptEnvir
 	if (low < 0 || high < 0 || low >= n || high >= n || low + high >= n)
 		env->ThrowError(ERROR_PREFIX "Invalid values supplied for low and/or high limits.");
 
-	return new Median(clips[0], clips, low, high, args[3].AsBool(true), env);
+    bool chroma = args[3].AsBool(true);
+
+	return new Median(clips[0], clips, low, high, false, chroma, env);
 }
 
 
@@ -77,6 +101,7 @@ AVSValue __cdecl Create_MedianBlend(AVSValue args, void* user_data, IScriptEnvir
 extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment* env)
 {
 	env->AddFunction("Median", "c+[CHROMA]b", Create_Median, 0);
+    env->AddFunction("TemporalMedian", "c[RADIUS]i[CHROMA]b", Create_TemporalMedian, 0);
 	env->AddFunction("MedianBlend", "c+[LOW]i[HIGH]i[CHROMA]b", Create_MedianBlend, 0);
 
 	return "Median of clips filter";
