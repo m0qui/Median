@@ -20,7 +20,7 @@ BEGIN
             VALUE "FileDescription", "Median for Avisynth 2.6 interface\0"
             VALUE "FileVersion", "0, 7, 0, 0\0"
             VALUE "InternalName", "Median\0"
-            VALUE "LegalCopyright", "Copyright (C) 2005-2009 Rainer Wittmann, (C)2021 et al.\0"
+            VALUE "LegalCopyright", "Copyright (C) 2021 et al.\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "Median.dll\0"
             VALUE "PrivateBuild", "\0"
