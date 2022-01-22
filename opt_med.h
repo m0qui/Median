@@ -10,6 +10,8 @@
 #ifndef _OPT_MED_H
 #define _OPT_MED_H
 
+#include <avs/minmax.h>
+
 typedef unsigned char pixelvalue;
 #define PIX_SORT(a,b) { if ((a)>(b)) PIX_SWAP((a),(b)); }
 #define PIX_SWAP(a,b) { pixelvalue temp=(a);(a)=(b);(b)=temp; }

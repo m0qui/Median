@@ -2,6 +2,9 @@
 #define MEDIAN_H
 
 #include <vector>
+#include <stdint.h>
+#include <cstdint>
+
 using std::vector;
 
 const unsigned int MAX_DEPTH = 25;
@@ -40,7 +43,7 @@ private:
     void ProcessPlanarFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
     void ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& dst);
     inline unsigned char ProcessPixel(unsigned char* values) const;
-    inline std::uint16_t ProcessPixel_16bit(uint16_t *values) const;
+    inline std::uint16_t ProcessPixel_16bit(std::uint16_t* values) const;
 
     void debugf(const char* fmt, ...);
 

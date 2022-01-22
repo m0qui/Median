@@ -19,11 +19,14 @@
 // 14-Feb-2014,  0.4: Added MedianBlend functionality
 // 15-Mar-2014,  0.5: Added TemporalMedian functionality
 // xx-Nov-2015,  0.6: Added sync functionality
+// 01-Feb-2019,  0.6: RBG64, 32/64bit by TomArrow
+// 21-Jan-2022,  0.6: Linux port
 //
 //////////////////////////////////////////////////////////////////////////////
 
 // Includes
 #include "stdafx.h"
+#include "stdint.h"
 
 const AVS_Linkage* AVS_linkage;
 

@@ -1,21 +1,23 @@
 #include <cstdarg>
+#include <iostream>
 
 #include "stdafx.h"
 #include "print.h"
+#include "stdint.h"
 
 
 //////////////////////////////////////////////////////////////////////////////
 // Constructor
 //////////////////////////////////////////////////////////////////////////////
 Median::Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned int _high, bool _temporal, bool _processchroma, unsigned int _sync, unsigned int _samples, bool _debug, IScriptEnvironment *env) :
-  GenericVideoFilter(_child), clips(_clips), low(_low), high(_high), temporal(_temporal), processchroma(_processchroma), sync(_sync), samples(_samples), debug(_debug)
+GenericVideoFilter(_child), clips(_clips), low(_low), high(_high), temporal(_temporal), processchroma(_processchroma), sync(_sync), samples(_samples), debug(_debug)
 {
     if (temporal)
         depth = 2 * low + 1; // In this case low == high == radius and we only have one source clip
     else
-        depth = (int)clips.size();
+        depth = clips.size();
 
-	blend = depth - low - high;
+    blend = depth - low - high;
 
     if (blend == 1 && low == high && depth <= MAX_OPT)
         fastprocess = true;
@@ -23,7 +25,7 @@ Median::Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned i
         fastprocess = false;
 
     debugf("depth: %d, blend: %d, low: %d, high: %d, fast: %d, temporal: %d, sync: %d, samples: %d", 
-           depth, blend, low, high, (int)fastprocess, (int)temporal, (int)sync, (int)samples);
+       depth, blend, low, high, (int)fastprocess, (int)temporal, (int)sync, (int)samples);
 
     switch (depth)
     {
@@ -32,7 +34,7 @@ Median::Median(PClip _child, vector<PClip> _clips, unsigned int _low, unsigned i
         case 7: fastmedian = opt_med7; break;
         case 9: fastmedian = opt_med9; break;
     }
-	
+
     if (temporal) 
     {
         info.push_back(clips[0]->GetVideoInfo());
@@ -114,7 +116,7 @@ PVideoFrame __stdcall Median::GetFrame(int n, IScriptEnvironment* env)
     }
 
 	// Output
-	PVideoFrame output = env->NewVideoFrame(vi);
+    PVideoFrame output = env->NewVideoFrame(vi);
 
     // Select between planar and interleaved processing
     if (info[0].IsPlanar())
@@ -341,9 +343,9 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
         // BGRA
         //////////////////////////////////////////////////////////////////////
         std::uint16_t b_16bit[MAX_DEPTH];
-		std::uint16_t g_16bit[MAX_DEPTH];
-		std::uint16_t r_16bit[MAX_DEPTH];
-		std::uint16_t a_16bit[MAX_DEPTH];
+        std::uint16_t g_16bit[MAX_DEPTH];
+        std::uint16_t r_16bit[MAX_DEPTH];
+        std::uint16_t a_16bit[MAX_DEPTH];
 
         for (int y = 0; y < height; ++y)
         {
@@ -351,40 +353,40 @@ void Median::ProcessInterleavedFrame(PVideoFrame src[MAX_DEPTH], PVideoFrame& ds
             {
                 for (unsigned int i = 0; i < depth; i++)
                 {
-					b_16bit[i] = srcp[i][x * 8 + 0] | (srcp[i][x * 8 + 1] << 8);
-					g_16bit[i] = srcp[i][x * 8 + 2] | (srcp[i][x * 8 + 3] << 8);
-					r_16bit[i] = srcp[i][x * 8 + 4] | (srcp[i][x * 8 + 5] << 8);
-					a_16bit[i] = srcp[i][x * 8 + 6] | (srcp[i][x * 8 + 7] << 8);
-                }
-				
-				uint16_t median_b = ProcessPixel_16bit(b_16bit);
-				uint16_t median_g = ProcessPixel_16bit(g_16bit);
-				uint16_t median_r = ProcessPixel_16bit(r_16bit);
-				uint16_t median_a = ProcessPixel_16bit(a_16bit);
-								
-				dstp[x * 8] = static_cast<BYTE>(median_b);
-				dstp[x * 8 + 1] = static_cast<BYTE>(median_b >> 8);
-				dstp[x * 8 + 2] = static_cast<BYTE>(median_g);
-				dstp[x * 8 + 3] = static_cast<BYTE>(median_g >> 8);
-				dstp[x * 8 + 4] = static_cast<BYTE>(median_r);
-				dstp[x * 8 + 5] = static_cast<BYTE>(median_r >> 8);
-				dstp[x * 8 + 6] = static_cast<BYTE>(processchroma ? median_a : a_16bit[0]);
-				dstp[x * 8 + 7] = static_cast<BYTE>(processchroma ? median_a >> 8 : a_16bit[0] >> 8);
-            }
+                 b_16bit[i] = srcp[i][x * 8 + 0] | (srcp[i][x * 8 + 1] << 8);
+                 g_16bit[i] = srcp[i][x * 8 + 2] | (srcp[i][x * 8 + 3] << 8);
+                 r_16bit[i] = srcp[i][x * 8 + 4] | (srcp[i][x * 8 + 5] << 8);
+                 a_16bit[i] = srcp[i][x * 8 + 6] | (srcp[i][x * 8 + 7] << 8);
+             }
 
-            for (unsigned int i = 0; i < depth; i++)
-                srcp[i] = srcp[i] + src[i]->GetPitch();
+             uint16_t median_b = ProcessPixel_16bit(b_16bit);
+             uint16_t median_g = ProcessPixel_16bit(g_16bit);
+             uint16_t median_r = ProcessPixel_16bit(r_16bit);
+             uint16_t median_a = ProcessPixel_16bit(a_16bit);
 
-            dstp = dstp + dst->GetPitch();
-        }
+             dstp[x * 8] = static_cast<BYTE>(median_b);
+             dstp[x * 8 + 1] = static_cast<BYTE>(median_b >> 8);
+             dstp[x * 8 + 2] = static_cast<BYTE>(median_g);
+             dstp[x * 8 + 3] = static_cast<BYTE>(median_g >> 8);
+             dstp[x * 8 + 4] = static_cast<BYTE>(median_r);
+             dstp[x * 8 + 5] = static_cast<BYTE>(median_r >> 8);
+             dstp[x * 8 + 6] = static_cast<BYTE>(processchroma ? median_a : a_16bit[0]);
+             dstp[x * 8 + 7] = static_cast<BYTE>(processchroma ? median_a >> 8 : a_16bit[0] >> 8);
+         }
+
+         for (unsigned int i = 0; i < depth; i++)
+            srcp[i] = srcp[i] + src[i]->GetPitch();
+
+        dstp = dstp + dst->GetPitch();
     }
+}
 }
 
 
 //////////////////////////////////////////////////////////////////////////////
 // Processing of a stack of pixel values
 //////////////////////////////////////////////////////////////////////////////
-inline uint16_t Median::ProcessPixel_16bit(uint16_t *values) const
+inline uint16_t Median::ProcessPixel_16bit(uint16_t* values) const
 {
 	uint16_t output;
 
@@ -416,13 +418,13 @@ inline unsigned char Median::ProcessPixel(unsigned char* values) const
         if (blend != depth) // If all clips are to be blended, there is no need to sort them
           std::sort(values, values + depth);
 
-        for (unsigned int i = low; i < low + blend; i++)
-            sum = sum + values[i];
+      for (unsigned int i = low; i < low + blend; i++)
+        sum = sum + values[i];
 
-        output = sum / blend;
-    }
+    output = sum / blend;
+}
 
-    return output;
+return output;
 }
 
 
@@ -438,10 +440,10 @@ void Median::debugf(const char* fmt, ...)
 
         va_list args;
         va_start(args, fmt);
-        vsnprintf_s(ptr, sizeof buffer, sizeof buffer, fmt, args);
+        snprintf(ptr, sizeof buffer, fmt, args);
         va_end(args);
 
-        OutputDebugStringA(buffer);
+        std::clog << buffer;
     }
 }
 
@@ -451,21 +453,26 @@ void Median::debugf(const char* fmt, ...)
 //////////////////////////////////////////////////////////////////////////////
 void Median::textf(PVideoFrame& dst, const char* fmt, ...)
 {
-    char string[1024] = { 0 };
-
-    int n = info[0].width / FONT_WIDTH;
-
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf_s(string, sizeof string, sizeof string, fmt, args);
-    va_end(args);
+    va_list arg;
+    va_start(arg, fmt);
+    size_t sz = snprintf(NULL, 0, fmt, arg);
+    char *buf = (char *)malloc(sz + 1);
+    vsprintf(buf, fmt, arg);
+    va_end (arg);
     
-    if      (info[0].IsYUY2()  ) print_yuyv  (dst, line, string);
-    else if (info[0].IsRGB24() ) print_rgb   (dst, line, string, false);
-    else if (info[0].IsRGB32() ) print_rgb   (dst, line, string, true);
-    else if (info[0].IsPlanar()) print_planar(dst, line, string);
-
+    if (info[0].IsYUY2()  ) print_yuyv  (dst, line, buf);
+    else if (info[0].IsRGB24() ) print_rgb   (dst, line, buf, false);
+    else if (info[0].IsRGB32() ) print_rgb   (dst, line, buf, true);
+    else if (info[0].pixel_type == VideoInfo::CS_BGR64) print_rgb64 (dst, line, buf);
+    else if (info[0].IsPlanar()) {
+        if (info[0].BitsPerPixel() > 8) {
+            print_planar(dst, line, buf, true);
+        }
+        else
+        {
+            print_planar(dst, line, buf, false);
+        }
+    }
     line++;
 }
-
 

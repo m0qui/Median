@@ -9,7 +9,8 @@
 
 void print_yuyv(PVideoFrame& dst, unsigned int line, const char* string);
 void print_rgb(PVideoFrame& dst, unsigned int line, const char* string, bool alpha);
-void print_planar(PVideoFrame& dst, unsigned int line, const char* string);
+void print_rgb64(PVideoFrame& dst, unsigned int line, const char* string);
+void print_planar(PVideoFrame& dst, unsigned int line, const char* string, bool hibit);
 
 #endif // PRINT_H
 
